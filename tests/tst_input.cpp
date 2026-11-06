@@ -3,6 +3,7 @@
 #include "input/PalmGesture.h"
 
 #include <QApplication>
+#include <QNativeGestureEvent>
 #include <QTabletEvent>
 #include <QTouchEvent>
 #include <QtTest>
@@ -17,9 +18,14 @@ struct Recorder : InputSink
     QVector<PointerEvent> pointers;
     QVector<GestureEvent> gestures;
     int wheelZooms = 0;
+    qreal zoom = 1.0; ///< product of all wheel / trackpad zoom factors
     void pointerEvent(PointerEvent& e) override { pointers.push_back(e); }
     void gestureEvent(const GestureEvent& e) override { gestures.push_back(e); }
-    void wheelZoom(const QPointF&, qreal) override { ++wheelZooms; }
+    void wheelZoom(const QPointF&, qreal factor) override
+    {
+        ++wheelZooms;
+        zoom *= factor;
+    }
     void wheelPan(const QPointF&) override {}
     void dragPan(const QPointF&) override {}
 
@@ -152,6 +158,62 @@ private slots:
         QCOMPARE(r.count(PointerPhase::Move), 1);
         QCOMPARE(r.count(PointerPhase::Up), 1);
         QCOMPARE(r.pointers.first().device, PointerDevice::Touch);
+    }
+
+    void trackpadFingersDoNotDraw()
+    {
+        // macOS reports fingers on a trackpad as touch points: they must not draw or wipe.
+        Recorder r;
+        InputManager input(r);
+        static QTouchDevice* trackpad = QTest::createTouchDevice(QTouchDevice::TouchPad);
+        for (int i = 0; i < 2; ++i) {
+            QTouchEvent::TouchPoint a(1);
+            a.setPos(QPointF(100, 100));
+            a.setState(Qt::TouchPointPressed);
+            QTouchEvent::TouchPoint b(2);
+            b.setPos(QPointF(130, 100));
+            b.setState(Qt::TouchPointPressed);
+            QTouchEvent begin(QEvent::TouchBegin, trackpad, Qt::NoModifier, Qt::TouchPointPressed, {a, b});
+            QVERIFY(!input.handleEvent(&begin));
+            QVERIFY(!begin.isAccepted());
+            a.setPos(QPointF(160, 120));
+            a.setState(Qt::TouchPointMoved);
+            QTouchEvent update(QEvent::TouchUpdate, trackpad, Qt::NoModifier, Qt::TouchPointMoved, {a, b});
+            input.handleEvent(&update);
+            a.setState(Qt::TouchPointReleased);
+            b.setState(Qt::TouchPointReleased);
+            QTouchEvent end(QEvent::TouchEnd, trackpad, Qt::NoModifier, Qt::TouchPointReleased, {a, b});
+            input.handleEvent(&end);
+        }
+        QVERIFY(r.pointers.isEmpty());
+        QVERIFY(r.gestures.isEmpty());
+        QCOMPARE(input.touchState(), InputManager::TouchState::Idle);
+        // A real touch screen still writes.
+        TouchScript t(input);
+        t.press(1, QPointF(100, 100));
+        t.release(1);
+        QCOMPARE(r.count(PointerPhase::Up), 1);
+    }
+
+    void trackpadPinchZooms()
+    {
+        Recorder r;
+        InputManager input(r);
+        static QTouchDevice* trackpad = QTest::createTouchDevice(QTouchDevice::TouchPad);
+        auto send = [&](Qt::NativeGestureType type, qreal value) {
+            QNativeGestureEvent e(type, trackpad, QPointF(200, 150), QPointF(200, 150), QPointF(200, 150), value, 0, 0);
+            const bool handled = input.handleEvent(&e);
+            QVERIFY(handled);
+        };
+        send(Qt::BeginNativeGesture, 0);
+        send(Qt::ZoomNativeGesture, 0.1);
+        send(Qt::ZoomNativeGesture, 0.1);
+        send(Qt::EndNativeGesture, 0);
+        QCOMPARE(r.wheelZooms, 2);
+        QVERIFY(qAbs(r.zoom - 1.21) < 1e-9);
+        send(Qt::ZoomNativeGesture, -0.5);
+        QVERIFY(qAbs(r.zoom - 0.605) < 1e-9);
+        QVERIFY(r.pointers.isEmpty());
     }
 
     void twoFingersPinch()

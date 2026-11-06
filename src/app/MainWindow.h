@@ -41,6 +41,11 @@ public:
 
     /// Opens a lesson passed on the command line (or restores a crashed session).
     void startup(const QString& fileToOpen);
+    /// Opens files handed over by the system or dropped on the board: a lesson is opened (after
+    /// asking about unsaved changes), PDFs and presentations are imported as pages and images
+    /// are inserted around pageCenter (the middle of the visible board when null). Returns false
+    /// if none of the files is of a kind ClassBoard opens.
+    bool openFiles(const QStringList& paths, QPointF pageCenter = QPointF());
 
     CanvasWidget& canvas() { return *m_canvas; }
     Document& document() { return *m_doc; }
@@ -75,6 +80,8 @@ private:
     void onCoreToolClicked(ToolId id, const QString& popoverKey);
     void toggleFullScreen();
     void addPage();
+
+    bool m_startupFileOpened = false;
 
     UiContext& m_ui;
     AppSettings& m_settings;

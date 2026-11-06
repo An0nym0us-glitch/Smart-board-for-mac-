@@ -301,6 +301,42 @@ private slots:
         QCOMPARE(doc().filePath(), path);
         shot(QStringLiteral("08-reopened"));
     }
+
+    void openFilesFromSystem()
+    {
+        // What a Finder double-click / "Open With" (QFileOpenEvent on macOS) or a drop does.
+        QTemporaryDir dir;
+        const QString lesson = dir.filePath(QStringLiteral("finder.classboard"));
+        doc().setFilePath(lesson);
+        bool done = false;
+        m_window->lesson().save([&](bool) { done = true; });
+        QTRY_VERIFY_WITH_TIMEOUT(done, 10000);
+        const int objects = page().objectCount();
+        QVERIFY(objects > 0);
+        doc().resetToNew(TemplateSpec());
+        QCOMPARE(page().objectCount(), 0);
+        QVERIFY(m_window->openFiles({lesson}));
+        QTRY_COMPARE_WITH_TIMEOUT(page().objectCount(), objects, 10000);
+        QCOMPARE(doc().filePath(), lesson);
+
+        // An image is placed on the current page.
+        const QString png = dir.filePath(QStringLiteral("picture.png"));
+        QImage img(64, 48, QImage::Format_RGB32);
+        img.fill(Qt::red);
+        QVERIFY(img.save(png));
+        QVERIFY(m_window->openFiles({png}));
+        QTRY_COMPARE_WITH_TIMEOUT(page().objectCount(), objects + 1, 10000);
+        QCOMPARE(page().objectAt(page().objectCount() - 1)->type(), ObjectType::Image);
+
+        // Files ClassBoard does not open are left alone.
+        const QString text = dir.filePath(QStringLiteral("notes.txt"));
+        QFile f(text);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("hello");
+        f.close();
+        QVERIFY(!m_window->openFiles({text}));
+        QCOMPARE(page().objectCount(), objects + 1);
+    }
 };
 
 QTEST_MAIN(TestUi)

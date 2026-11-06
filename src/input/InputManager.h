@@ -9,6 +9,7 @@
 
 class QEvent;
 class QMouseEvent;
+class QNativeGestureEvent;
 class QTabletEvent;
 class QTouchEvent;
 class QWheelEvent;
@@ -47,6 +48,10 @@ public:
 ///  * pen priority        -> while the stylus touches or hovers over the board (and briefly after),
 ///                           new touches are ignored so a resting hand neither draws nor
 ///                           palm-erases; a young finger stroke is cancelled when the pen lands
+///
+/// Trackpads (macOS reports their fingers as touch points too) never draw: two-finger scrolling
+/// pans (wheel events with pixel deltas) and pinching zooms (native zoom gestures), as in any
+/// other Mac app.
 class InputManager
 {
 public:
@@ -99,6 +104,7 @@ private:
     bool handleTablet(QTabletEvent* e);
     bool handleTouch(QTouchEvent* e);
     bool handleWheel(QWheelEvent* e);
+    bool handleNativeGesture(QNativeGestureEvent* e);
 
     void forwardTouch(int id, PointerPhase phase, const Track& t, Qt::KeyboardModifiers mods);
     void classifyNewTouch(int id, qint64 now, Qt::KeyboardModifiers mods);

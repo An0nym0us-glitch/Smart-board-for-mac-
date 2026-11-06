@@ -34,6 +34,9 @@ ClassBoard opens on a clean blackboard with the pen ready. The ribbon at the bot
 | Zoom | pinch (one hand, or one finger of each hand) | – | wheel |
 | Erase | three fingers held together or flat hand, wipe | pen eraser end | – |
 
+On a **Mac trackpad**, fingers never draw: click and drag to draw (or use a pen tablet or an
+interactive display), scroll with two fingers to pan and pinch to zoom.
+
 * **Wipe (palm erase)**: put three fingers down side by side, touching or nearly touching, and
   wipe like a board eraser. It works in every tool, erases ink, shapes, lines, arrows,
   equations and other objects it passes over (pictures and imported slides stay), draws
@@ -188,6 +191,10 @@ MORE → Function / Graph → *Insert graph*.
   whatever the zoom.
 
 ## Keyboard shortcuts
+
+On a Mac, use **⌘ Command** wherever the table says Ctrl (⌘Z undo, ⌘⇧Z redo, ⌘S save …), and
+**⌘ + scroll** zooms. Full screen is also **⌃⌘F** or the window's green button; **⌘Q** quits
+(you are asked about unsaved changes).
 
 | Keys | Action |
 |---|---|

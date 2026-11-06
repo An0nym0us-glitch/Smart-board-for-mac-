@@ -1,7 +1,28 @@
-# ClassBoard
+# ClassBoard for macOS
 
 ClassBoard is an open-source digital whiteboard for large interactive classroom displays.
-It is written in C++17 with Qt 5.15, targets Windows 10/11, and works fully offline.
+It is written in C++17 with Qt 5.15 and works fully offline. This is the macOS edition of
+[ClassBoard](https://github.com/An0nym0us-glitch/Smart-board): it runs natively on Apple
+silicon and Intel Macs as a normal `ClassBoard.app`, and the same code still builds for
+Windows 10/11 and Linux.
+
+## Installing on a Mac
+
+1. Download the disk image for your Mac from a GitHub release (or from the build artifacts
+   of the *Build and test* workflow):
+   * **Apple silicon** (M1 and later): `ClassBoard-<version>-macOS-arm64.dmg`
+   * **Intel**, or any Mac with macOS 10.13 or later: `ClassBoard-<version>-macOS-x86_64.dmg`
+     (it also runs on Apple silicon through Rosetta 2)
+2. Open it and drag **ClassBoard** onto **Applications**.
+3. The app is not signed with an Apple Developer ID, so the first time macOS says it cannot
+   check it. Open it once from **System Settings → Privacy & Security → Open Anyway**, or run
+   `xattr -dr com.apple.quarantine /Applications/ClassBoard.app`.
+
+`.classboard` lessons then open with a double-click in Finder, and **Open With → ClassBoard**
+imports PDFs, presentations and images. On a trackpad, two fingers scroll the board and a
+pinch zooms; on an interactive display or pen tablet connected to the Mac you write directly.
+Shortcuts use ⌘ where the guide says Ctrl. PDF import works out of the box; PowerPoint import
+needs the free [LibreOffice](https://www.libreoffice.org) in Applications.
 
 The board fills the screen. The most-used commands sit in a ribbon along the bottom, and the
 rest open as popovers attached to the button that opened them, so you stay on the board.
@@ -36,8 +57,22 @@ There is one undo/redo history for every tool, and undo jumps to the page it cha
 
 ## Building
 
-Requirements: CMake ≥ 3.16, a C++17 compiler (MSVC 2019/2022, GCC 9+ or Clang 10+), and
-Qt 5.15 with the Widgets and Svg modules.
+Requirements: CMake ≥ 3.16, a C++17 compiler (Apple Clang from Xcode or its command line
+tools, MSVC 2019/2022, GCC 9+ or Clang 10+), and Qt 5.15 with the Widgets and Svg modules.
+
+On macOS:
+
+```bash
+brew install qt@5 cmake ninja poppler
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)" \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion | cut -d. -f1).0"
+cmake --build build
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure   # unit and integration tests
+open build/bin/ClassBoard.app
+scripts/macos/package.sh build                                         # self-contained .dmg
+```
+
+On Windows and Linux:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -46,8 +81,8 @@ ctest --test-dir build --output-on-failure     # unit and integration tests
 ./build/bin/ClassBoard                          # build\bin\ClassBoard.exe on Windows
 ```
 
-[docs/BUILDING.md](docs/BUILDING.md) covers step-by-step Windows instructions, deployment with
-`windeployqt` and building the installer.
+[docs/BUILDING.md](docs/BUILDING.md) covers step-by-step macOS and Windows instructions,
+deployment with `macdeployqt` / `windeployqt`, the disk image and the Windows installer.
 
 **Installing on Windows 10/11:** download `ClassBoard-Setup-<version>-x64.exe` (from a GitHub
 release, or the *ClassBoard-Setup-windows-x64* build artifact) and run it. It installs
@@ -81,7 +116,8 @@ src/
   storage/    container format, serializer, autosave / recovery, PDF import
   ai/         shape recognizer, recogniser plug-in interfaces
 tests/        Qt Test suites (core + UI integration)
-resources/    icons, themes, templates, application icon
+resources/    icons, themes, templates, application icons, macOS Info.plist
+scripts/macos/ disk image packaging and checks
 ```
 
 ## License

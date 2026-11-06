@@ -1,17 +1,23 @@
 # Third-party notices
 
-ClassBoard itself is licensed under the MIT License (see `LICENSE`). The Windows installer and
-the portable download also contain the following third-party software, each under its own
-licence. The full licence texts are in the `licenses` folder next to this file.
+ClassBoard itself is licensed under the MIT License (see `LICENSE`). The Windows installer, the
+portable download and the macOS disk images also contain the following third-party software,
+each under its own licence. The full licence texts are in the `licenses` folder next to this
+file.
 
 ## Qt 5.15
 
 * Copyright © The Qt Company Ltd. and other contributors.
 * Used under the **GNU Lesser General Public License version 3** (`licenses/LGPL-3.0.txt`,
   which builds on `licenses/GPL-3.0.txt`).
-* ClassBoard uses the Qt Core, Gui, Widgets and Svg modules and the plugins `windeployqt`
-  deploys with them. They are dynamically linked: the Qt DLLs and plugins in the `bin`
-  folder are unmodified and can be replaced with other compatible builds of Qt 5.15.
+* ClassBoard uses the Qt Core, Gui, Widgets and Svg modules (and, in the Intel macOS build,
+  Qt PDF) and the plugins `windeployqt` / `macdeployqt` deploy with them. They are
+  dynamically linked: the Qt DLLs and plugins in the `bin` folder, and the frameworks and
+  plug-ins in `ClassBoard.app/Contents/Frameworks` and `Contents/PlugIns` on macOS, are
+  unmodified apart from the library paths `macdeployqt` rewrites, and can be replaced with
+  other compatible builds of Qt 5.15.
+* The Apple silicon macOS build uses Homebrew's Qt 5.15 (`qt@5`,
+  <https://formulae.brew.sh/formula/qt@5>); the Intel build uses the official Qt 5.15.2.
 * Source code: <https://download.qt.io/archive/qt/5.15/> (Qt 5.15.2) and
   <https://code.qt.io/>.
 * Qt includes third-party components (for example zlib, libpng, PCRE2, HarfBuzz, FreeType and
@@ -32,6 +38,10 @@ licence. The full licence texts are in the `licenses` folder next to this file.
 * The libraries bundled with Poppler (such as Cairo, FreeType, Fontconfig, libpng, libjpeg,
   libtiff, OpenJPEG, Little CMS and zlib) are under their own open-source licences; the licence
   files that come with that build are copied to `bin\poppler\licenses`.
+* **macOS (Apple silicon build):** `pdftoppm` is shipped in `ClassBoard.app/Contents/MacOS`
+  and the libraries it needs in `Contents/Frameworks`, taken unmodified (apart from library
+  paths) from Homebrew's `poppler` formula (<https://formulae.brew.sh/formula/poppler>), which
+  documents how it and its dependencies are built.
 
 ## Microsoft Visual C++ runtime
 

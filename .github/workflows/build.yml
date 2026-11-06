@@ -109,6 +109,120 @@ jobs:
           path: ClassBoard
 
 
+  macos-arm64:
+    name: macOS (Apple silicon, Qt 5.15)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      # Homebrew's Qt 5.15 is a native arm64 build. Its libraries are made for the runner's macOS,
+      # so the app requires that version too (the Intel build below runs on older Macs).
+      - name: Install dependencies
+        run: |
+          brew update > /dev/null || true
+          brew install qt@5 poppler ninja
+          echo "QT_PREFIX=$(brew --prefix qt@5)" >> "$GITHUB_ENV"
+          echo "MACOS_TARGET=$(sw_vers -productVersion | cut -d. -f1).0" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_PREFIX" -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_TARGET"
+          # Without Qt PDF, Poppler's pdftoppm is shipped inside ClassBoard.app for PDF import.
+          if ! grep -q '^CLASSBOARD_USES_QTPDF:INTERNAL=\(1\|ON\|TRUE\)' build/CMakeCache.txt; then
+            cmake build -DCLASSBOARD_PDFTOPPM="$(brew --prefix)/bin/pdftoppm"
+          fi
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_FORCE_STDERR_LOGGING: 1
+
+      - name: Build disk image
+        run: scripts/macos/package.sh build
+
+      - name: Start the packaged app
+        timeout-minutes: 5
+        run: |
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/cb build/ClassBoard-*.dmg
+          /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --version
+          /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --screenshot "$PWD/screenshot-macos-arm64.png"
+          test -s screenshot-macos-arm64.png
+          hdiutil detach /tmp/cb
+
+      - name: Upload disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassBoard-macOS-arm64
+          path: build/ClassBoard-*.dmg
+
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-macos-arm64
+          path: screenshot-macos-arm64.png
+
+  macos-x86_64:
+    name: macOS (Intel, Qt 5.15)
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+
+      # The official Qt 5.15.2 build runs on macOS 10.13 and later. Its WebEngine package
+      # contains Qt PDF, so PDF import needs no Poppler.
+      - name: Install Qt 5.15
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          modules: 'qtwebengine'
+          cache: true
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_FORCE_STDERR_LOGGING: 1
+
+      - name: Build disk image
+        run: scripts/macos/package.sh build
+
+      - name: Start the packaged app
+        timeout-minutes: 5
+        run: |
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/cb build/ClassBoard-*.dmg
+          /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --version
+          /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --screenshot "$PWD/screenshot-macos-x86_64.png"
+          test -s screenshot-macos-x86_64.png
+          hdiutil detach /tmp/cb
+
+      - name: Upload disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassBoard-macOS-x86_64
+          path: build/ClassBoard-*.dmg
+
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-macos-x86_64
+          path: screenshot-macos-x86_64.png
+
   linux:
     name: Linux (GCC, Qt 5.15)
     runs-on: ubuntu-24.04

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Generated into the build tree by CMake (MACOSX_BUNDLE_INFO_PLIST) from the project version. -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>ClassBoard</string>
+    <key>CFBundleIconFile</key>
+    <string>classboard.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>@CLASSBOARD_BUNDLE_ID@</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>ClassBoard</string>
+    <key>CFBundleDisplayName</key>
+    <string>ClassBoard</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@PROJECT_VERSION@</string>
+    <key>CFBundleVersion</key>
+    <string>@PROJECT_VERSION@</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.education</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>MIT License. ClassBoard contributors.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <!-- ClassBoard never uses the camera, microphone or network. -->
+
+    <!-- The .classboard lesson format: double-click in Finder opens it in ClassBoard. -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>@CLASSBOARD_BUNDLE_ID@.lesson</string>
+            <key>UTTypeDescription</key>
+            <string>ClassBoard lesson</string>
+            <key>UTTypeIconFile</key>
+            <string>classboard.icns</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>classboard</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>ClassBoard lesson</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>CFBundleTypeIconFile</key>
+            <string>classboard.icns</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>@CLASSBOARD_BUNDLE_ID@.lesson</string>
+            </array>
+        </dict>
+        <!-- "Open With > ClassBoard" for files ClassBoard can import onto pages. -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>PDF document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.adobe.pdf</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Presentation</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>org.openxmlformats.presentationml.presentation</string>
+                <string>org.openxmlformats.presentationml.slideshow</string>
+                <string>com.microsoft.powerpoint.ppt</string>
+                <string>com.microsoft.powerpoint.pps</string>
+                <string>org.oasis-open.opendocument.presentation</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.png</string>
+                <string>public.jpeg</string>
+                <string>com.compuserve.gif</string>
+                <string>com.microsoft.bmp</string>
+                <string>public.svg-image</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

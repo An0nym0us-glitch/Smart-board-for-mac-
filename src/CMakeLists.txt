@@ -109,6 +109,8 @@ if(Qt5Pdf_FOUND)
 else()
     message(STATUS "ClassBoard: Qt PDF not found, PDF import uses Poppler's pdftoppm when installed")
 endif()
+# Read by CI to decide whether Poppler has to be shipped with the app.
+set(CLASSBOARD_USES_QTPDF "${Qt5Pdf_FOUND}" CACHE INTERNAL "ClassBoard renders PDFs with Qt PDF")
 
 if(MSVC)
     target_compile_options(classboard_lib PUBLIC /utf-8 /W4 /permissive- /wd4127)
@@ -126,13 +128,30 @@ if(WIN32)
     list(APPEND CLASSBOARD_APP_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/classboard.rc)
 endif()
 
-add_executable(ClassBoard WIN32 ${CLASSBOARD_APP_SOURCES})
+if(APPLE)
+    # macOS: a ClassBoard.app bundle with its icon and an Info.plist that registers .classboard
+    # lessons (double-click in Finder) and offers "Open With" for PDFs, presentations and images.
+    set(CLASSBOARD_BUNDLE_ID "io.github.classboard" CACHE STRING "macOS bundle identifier")
+    set(CLASSBOARD_MAC_ICON "${PROJECT_SOURCE_DIR}/resources/app/classboard.icns")
+    set_source_files_properties(${CLASSBOARD_MAC_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    list(APPEND CLASSBOARD_APP_SOURCES ${CLASSBOARD_MAC_ICON})
+    configure_file(${PROJECT_SOURCE_DIR}/resources/app/Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
+endif()
+
+add_executable(ClassBoard WIN32 MACOSX_BUNDLE ${CLASSBOARD_APP_SOURCES})
 target_link_libraries(ClassBoard PRIVATE classboard_lib)
 set_target_properties(ClassBoard PROPERTIES
     OUTPUT_NAME "ClassBoard"
     RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
+if(APPLE)
+    set_target_properties(ClassBoard PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${CLASSBOARD_BUNDLE_ID}")
+endif()
 
-install(TARGETS ClassBoard RUNTIME DESTINATION bin)
+install(TARGETS ClassBoard
+    RUNTIME DESTINATION bin
+    BUNDLE DESTINATION .)
 
 if(WIN32 AND CLASSBOARD_DEPLOY_QT)
     get_target_property(_qmake Qt5::qmake IMPORTED_LOCATION)
@@ -143,5 +162,20 @@ if(WIN32 AND CLASSBOARD_DEPLOY_QT)
             COMMAND "${WINDEPLOYQT}" --no-translations --no-system-d3d-compiler --no-opengl-sw
                     "$<TARGET_FILE:ClassBoard>"
             COMMENT "Deploying Qt runtime next to ClassBoard.exe")
+    endif()
+endif()
+
+if(APPLE AND CLASSBOARD_DEPLOY_QT)
+    # Copies the Qt frameworks and plug-ins into build/bin/ClassBoard.app, so the bundle runs
+    # on Macs without Qt. macdeployqt changes the binaries, so the bundle is signed again
+    # (ad hoc): Apple silicon refuses to run code whose signature does not match.
+    get_target_property(_qmake Qt5::qmake IMPORTED_LOCATION)
+    get_filename_component(_qtbin "${_qmake}" DIRECTORY)
+    find_program(MACDEPLOYQT macdeployqt HINTS "${_qtbin}")
+    if(MACDEPLOYQT)
+        add_custom_command(TARGET ClassBoard POST_BUILD
+            COMMAND "${MACDEPLOYQT}" "$<TARGET_BUNDLE_DIR:ClassBoard>" -always-overwrite
+            COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:ClassBoard>"
+            COMMENT "Deploying Qt into ClassBoard.app")
     endif()
 endif()

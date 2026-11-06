@@ -26,8 +26,12 @@ namespace cb {
 namespace {
 QString tr(const char* s) { return QCoreApplication::translate("Import", s); }
 
-QString findTool(const QString& name, const QStringList& extraDirs)
+QString findTool(const QString& name, QStringList extraDirs)
 {
+#ifdef Q_OS_MACOS
+    // Apps started from Finder or the Dock get a minimal PATH without Homebrew or MacPorts.
+    extraDirs << QStringLiteral("/opt/homebrew/bin") << QStringLiteral("/usr/local/bin") << QStringLiteral("/opt/local/bin");
+#endif
     QString exe = QStandardPaths::findExecutable(name);
     if (exe.isEmpty())
         exe = QStandardPaths::findExecutable(name, extraDirs);
@@ -61,7 +65,8 @@ PdfImporter::~PdfImporter()
 
 QString PdfImporter::pdftoppmPath()
 {
-    // A copy shipped next to ClassBoard (poppler/bin or poppler/Library/bin) is also accepted.
+    // A copy shipped next to ClassBoard (poppler/bin or poppler/Library/bin) is also accepted;
+    // in the macOS app bundle it sits next to the executable in ClassBoard.app/Contents/MacOS.
     const QString app = QCoreApplication::applicationDirPath();
     return findTool(QStringLiteral("pdftoppm"),
                     {app + QStringLiteral("/poppler/bin"), app + QStringLiteral("/poppler/Library/bin"), app});
@@ -78,8 +83,13 @@ bool PdfImporter::isAvailable()
 
 QString PdfImporter::unavailableReason()
 {
+#ifdef Q_OS_MACOS
+    return tr("PDF import needs Poppler (pdftoppm). The macOS download of ClassBoard includes it; otherwise "
+              "install it with Homebrew (brew install poppler) or MacPorts (port install poppler).");
+#else
     return tr("PDF import needs Poppler (pdftoppm). The Windows download of ClassBoard includes it; otherwise "
               "install Poppler and add its bin folder to PATH, or put it in a “poppler” folder next to ClassBoard.");
+#endif
 }
 
 void PdfImporter::start(const QString& pdfPath, int dpi)
@@ -207,7 +217,8 @@ QString PresentationImporter::libreOfficePath()
     }
     dirs << QStringLiteral("C:/Program Files/LibreOffice/program") << QStringLiteral("C:/Program Files (x86)/LibreOffice/program");
 #elif defined(Q_OS_MACOS)
-    dirs << QStringLiteral("/Applications/LibreOffice.app/Contents/MacOS");
+    dirs << QStringLiteral("/Applications/LibreOffice.app/Contents/MacOS")
+         << QDir::homePath() + QStringLiteral("/Applications/LibreOffice.app/Contents/MacOS");
 #endif
     QString exe = findTool(QStringLiteral("soffice"), dirs);
     if (exe.isEmpty())
@@ -237,8 +248,13 @@ QString PresentationImporter::unavailableReason()
 {
     if (!PdfImporter::isAvailable())
         return PdfImporter::unavailableReason();
+#ifdef Q_OS_MACOS
+    return tr("PowerPoint import needs the free LibreOffice (works offline). Install it in the Applications "
+              "folder (libreoffice.org, or brew install --cask libreoffice) and try again.");
+#else
     return tr("PowerPoint import needs Microsoft PowerPoint or the free LibreOffice (both work offline). "
               "Install one of them and try again.");
+#endif
 }
 
 void PresentationImporter::start(const QString& path, int dpi)

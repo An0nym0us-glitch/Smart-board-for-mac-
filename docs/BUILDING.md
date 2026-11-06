@@ -56,6 +56,8 @@ certificate.
 
 ### Publishing a release
 
+The release contains the Windows installer and both macOS disk images.
+
 Releases are made by `.github/workflows/release.yml`. GitHub releases are immutable once
 published (no assets can be added afterwards), so the workflow builds and tests, uploads the
 installer to a **draft** release, checks the upload and only then publishes it. Never create
@@ -71,7 +73,9 @@ exists, and the installer can then never be attached.
      optionally a title (giving "ClassBoard v0.3.0 — <title>") and whether it is a
      pre-release; the workflow creates the tag `v0.3.0` when it publishes; or
    * from git: `git tag v0.3.0 && git push origin v0.3.0`.
-3. The release appears with `ClassBoard-Setup-0.3.0-x64.exe` once the run is green. You can
+3. The release appears with `ClassBoard-Setup-0.3.0-x64.exe`,
+   `ClassBoard-0.3.0-macOS-arm64.dmg` and `ClassBoard-0.3.0-macOS-x86_64.dmg` once the run is
+   green. You can
    edit its notes afterwards; its assets are fixed.
 
 The workflow refuses, before building, a version that does not match `CMakeLists.txt`, a
@@ -110,6 +114,88 @@ Everything works offline; nothing is uploaded anywhere.
 * **Recogniser plug-ins.** Offline handwriting-to-formula recognisers are Qt plug-ins placed in
   `plugins\recognizers` next to the executable. See `src/ai/Recognition.h`.
 
+## macOS 10.13 and later (Apple silicon and Intel)
+
+ClassBoard builds as a normal `ClassBoard.app` bundle and is packaged as a drag-to-Applications
+disk image.
+
+1. Install the **Xcode command line tools** (`xcode-select --install`) and
+   [Homebrew](https://brew.sh).
+2. Install Qt 5.15 and the build tools. Either
+   * Homebrew (native on Apple silicon and Intel; the app then needs the macOS version
+     Homebrew's libraries were built for, usually the one you build on):
+     ```bash
+     brew install qt@5 cmake ninja poppler
+     cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+           -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)" \
+           -DCMAKE_OSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion | cut -d. -f1).0"
+     ```
+   * or the official Qt 5.15.2 build (Intel; also runs on Apple silicon through Rosetta 2,
+     and on macOS 10.13 and later). Its *Qt WebEngine* package contains Qt PDF, which
+     ClassBoard then uses for PDF import:
+     ```bash
+     pip3 install aqtinstall
+     aqt install-qt mac desktop 5.15.2 clang_64 -m qtwebengine -O ~/Qt
+     cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+           -DCMAKE_PREFIX_PATH=~/Qt/5.15.2/clang_64 -DCMAKE_OSX_ARCHITECTURES=x86_64
+     ```
+3. Build, test and run:
+   ```bash
+   cmake --build build
+   QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+   open build/bin/ClassBoard.app
+   ```
+   The bundle in the build tree uses the Qt it was built against. Configure with
+   `-DCLASSBOARD_DEPLOY_QT=ON` to copy Qt into it after every build (`macdeployqt`), so it
+   also runs on Macs without Qt.
+
+### Disk image (.dmg)
+
+CI builds `ClassBoard-<version>-macOS-arm64.dmg` (Apple silicon, Homebrew Qt) and
+`ClassBoard-<version>-macOS-x86_64.dmg` (Intel, Qt 5.15.2, macOS 10.13+) on every push
+(artifacts **ClassBoard-macOS-arm64** and **ClassBoard-macOS-x86_64**). To build one yourself
+from a configured build tree:
+
+```bash
+# Optional, when Qt PDF is not available: ship Poppler's pdftoppm inside the app.
+cmake build -DCLASSBOARD_PDFTOPPM="$(brew --prefix)/bin/pdftoppm"
+cmake --build build
+scripts/macos/package.sh build
+```
+
+The script runs CPack, which installs `ClassBoard.app`, runs `macdeployqt` (Qt frameworks and
+plug-ins, plus `pdftoppm` and its libraries when configured) and signs the bundle ad hoc. It
+then mounts the image and checks that nothing in the app loads a library from outside the
+bundle or macOS. The image contains `ClassBoard.app`, a link to `Applications` and the
+documentation.
+
+`ClassBoard.app` registers the `.classboard` lesson type, so lessons open with a double-click
+in Finder, and offers **Open With → ClassBoard** for PDFs, presentations and images (they
+are imported onto pages).
+
+**Signing.** The app is signed ad hoc, not with an Apple Developer ID, so the first time it
+is opened macOS says it "cannot check it for malicious software". Open it once from
+**System Settings → Privacy & Security → Open Anyway** (on macOS 14 and earlier, Control-click
+the app → **Open** also works), or remove the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ClassBoard.app
+```
+
+With a Developer ID certificate in your keychain, configure with
+`-DCLASSBOARD_CODESIGN_IDENTITY="Developer ID Application: <name> (<team>)"` to sign with the
+hardened runtime, then notarise the image with `xcrun notarytool submit … --wait` and
+`xcrun stapler staple`.
+
+### Import on macOS
+
+* **PDF:** built in (Qt PDF, Intel build) or with the `pdftoppm` shipped in the app (Apple
+  silicon build). A source build without either finds Poppler from Homebrew or MacPorts
+  (`brew install poppler`) even when ClassBoard is started from Finder.
+* **PowerPoint (.ppt, .pptx):** needs LibreOffice in `/Applications` or `~/Applications`
+  (`brew install --cask libreoffice`). Microsoft PowerPoint for Mac cannot be automated
+  headlessly, so it is not used.
+
 ## Linux (development)
 
 ```bash
@@ -123,13 +209,17 @@ ctest --test-dir build --output-on-failure
 
 ## Continuous integration
 
-`.github/workflows/build.yml` builds and tests on Windows (MSVC, Qt 5.15.2) and Linux on every
-push, with Poppler and LibreOffice installed so the import tests run too. It uploads a
-ready-to-run Windows folder (including Poppler) as a build artifact.
+`.github/workflows/build.yml` builds and tests on Windows (MSVC, Qt 5.15.2), macOS (Apple
+silicon with Homebrew's Qt 5.15, Intel with Qt 5.15.2) and Linux on every push, with Poppler
+and LibreOffice installed on Windows and Linux so the import tests run too. It uploads a
+ready-to-run Windows folder (including Poppler), the Windows installer and both macOS disk
+images as build artifacts. The macOS jobs also start the packaged app and upload a screenshot
+of it.
 
 ## Diagnostics
 
-* `ClassBoard --screenshot out.png` renders the window after start-up and exits.
+* `ClassBoard --screenshot out.png` renders the window after start-up and exits (on macOS:
+  `ClassBoard.app/Contents/MacOS/ClassBoard --screenshot out.png`).
 * `ClassBoard --ui-scale 1.5` overrides the interface size.
 * Set `CLASSBOARD_SCREENSHOTS=<dir>` when running `tst_ui`, `tst_tools_ui` or `tst_board_ui`
   to get a screenshot of every popover and tool.

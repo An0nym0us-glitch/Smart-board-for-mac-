@@ -1,10 +1,11 @@
 name: Release
 
-# Publishes a GitHub release with the Windows installer.
+# Publishes a GitHub release with the Windows installer and the macOS disk images (Apple
+# silicon and Intel).
 #
 # Published releases are immutable: assets can only be added while a release is a draft. So
-# this workflow builds and tests first, attaches the installer to a DRAFT release, checks the
-# upload, and only then publishes the draft. Do not create the release on github.com first
+# this workflow builds and tests first, attaches the installers to a DRAFT release, checks the
+# uploads, and only then publishes the draft. Do not create the release on github.com first
 # (that publishes it, and its tag, before the installer exists). Start a release with either:
 #   * Actions -> Release -> Run workflow, version = the version in CMakeLists.txt (e.g. 0.3.0)
 #   * git tag v0.3.0 && git push origin v0.3.0
@@ -110,28 +111,30 @@ jobs:
         with:
           sparse-checkout: .github/release-notes
 
-      - name: Download the installer built and tested above
+      - name: Download the installers built and tested above
         uses: actions/download-artifact@v4
         with:
-          name: ClassBoard-Setup-windows-x64
+          pattern: ClassBoard-{Setup-windows-x64,macOS-arm64,macOS-x86_64}
+          merge-multiple: true
           path: dist
 
-      - name: Check the installer
-        id: asset
+      - name: Check the installers
         run: |
           set -euo pipefail
-          asset="ClassBoard-Setup-$VERSION-x64.exe"
           ls -l dist
-          if [ ! -f "dist/$asset" ] || [ "$(find dist -type f | wc -l)" -ne 1 ]; then
-            echo "::error::Expected exactly dist/$asset"
+          expected=("ClassBoard-Setup-$VERSION-x64.exe" "ClassBoard-$VERSION-macOS-arm64.dmg" "ClassBoard-$VERSION-macOS-x86_64.dmg")
+          for asset in "${expected[@]}"; do
+            if [ ! -f "dist/$asset" ]; then
+              echo "::error::Expected dist/$asset"
+              exit 1
+            fi
+          done
+          if [ "$(find dist -type f | wc -l)" -ne "${#expected[@]}" ]; then
+            echo "::error::Expected exactly ${expected[*]} in dist"
             exit 1
           fi
-          echo "name=$asset" >> "$GITHUB_OUTPUT"
-          echo "size=$(stat -c %s "dist/$asset")" >> "$GITHUB_OUTPUT"
 
-      - name: Create a draft release with the installer
-        env:
-          ASSET: ${{ steps.asset.outputs.name }}
+      - name: Create a draft release with the installers
         run: |
           set -euo pipefail
           title="ClassBoard $TAG"
@@ -142,12 +145,9 @@ jobs:
           notes=".github/release-notes/$TAG.md"
           if [ -f "$notes" ]; then flags+=(--notes-file "$notes"); else echo "No $notes; using generated notes only"; fi
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); else flags+=(--latest); fi
-          gh release create "$TAG" "dist/$ASSET" --repo "$GITHUB_REPOSITORY" "${flags[@]}"
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" "${flags[@]}"
 
-      - name: Verify the upload, then publish
-        env:
-          ASSET: ${{ steps.asset.outputs.name }}
-          SIZE: ${{ steps.asset.outputs.size }}
+      - name: Verify the uploads, then publish
         run: |
           set -euo pipefail
           ids=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
@@ -157,18 +157,25 @@ jobs:
             exit 1
           fi
           id="$ids"
-          uploaded=$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" \
-            --jq ".assets[] | select(.name == \"$ASSET\" and .state == \"uploaded\") | .size")
-          if [ "$uploaded" != "$SIZE" ]; then
-            echo "::error::$ASSET is not fully uploaded to the draft (size '$uploaded', expected $SIZE). The draft was not published."
-            exit 1
-          fi
+          for file in dist/*; do
+            asset=$(basename "$file")
+            size=$(stat -c %s "$file")
+            uploaded=$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" \
+              --jq ".assets[] | select(.name == \"$asset\" and .state == \"uploaded\") | .size")
+            if [ "$uploaded" != "$size" ]; then
+              echo "::error::$asset is not fully uploaded to the draft (size '$uploaded', expected $size). The draft was not published."
+              exit 1
+            fi
+          done
           # Publishing creates the tag (for the manual trigger) and makes the release immutable.
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false --jq '.html_url'
-          published=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
-            --jq "select(.draft == false) | .assets[] | select(.name == \"$ASSET\") | .name")
-          if [ "$published" != "$ASSET" ]; then
-            echo "::error::$TAG was not published with $ASSET"
-            exit 1
-          fi
-          echo "Published $TAG with $ASSET"
+          for file in dist/*; do
+            asset=$(basename "$file")
+            published=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
+              --jq "select(.draft == false) | .assets[] | select(.name == \"$asset\") | .name")
+            if [ "$published" != "$asset" ]; then
+              echo "::error::$TAG was not published with $asset"
+              exit 1
+            fi
+          done
+          echo "Published $TAG with $(ls dist | tr '\n' ' ')"

@@ -80,6 +80,10 @@ MainWindow::MainWindow(UiContext& ui, AppSettings& settings, QWidget* parent)
     m_settings.loadTools(*m_tools);
     m_templates->load();
     m_recognizers->loadPlugins(QCoreApplication::applicationDirPath() + QStringLiteral("/plugins/recognizers"));
+#ifdef Q_OS_MACOS
+    // Inside the app bundle: ClassBoard.app/Contents/PlugIns/recognizers.
+    m_recognizers->loadPlugins(QCoreApplication::applicationDirPath() + QStringLiteral("/../PlugIns/recognizers"));
+#endif
     // Built-in offline recogniser for the Magic Equation Maker (plug-in models take precedence).
     m_recognizers->registerEquationRecognizer(std::make_unique<MathInkRecognizer>());
 
@@ -492,6 +496,9 @@ void MainWindow::createShortcuts()
     add(QKeySequence(Qt::Key_PageUp), [this]() { m_doc->setCurrentPageIndex(m_doc->currentPageIndex() - 1); });
     add(QKeySequence(Qt::CTRL + Qt::Key_M), [this]() { addPage(); });
     add(QKeySequence(Qt::Key_F11), [this]() { toggleFullScreen(); });
+#ifdef Q_OS_MACOS
+    add(QKeySequence::FullScreen, [this]() { toggleFullScreen(); }); // Ctrl+Cmd+F
+#endif
     add(QKeySequence(Qt::CTRL + Qt::Key_0), [this]() { m_canvas->fitPage(); });
     add(QKeySequence::ZoomIn, [this]() { m_canvas->zoomBy(1.25); });
     add(QKeySequence(Qt::CTRL + Qt::Key_Equal), [this]() { m_canvas->zoomBy(1.25); });
@@ -518,8 +525,47 @@ void MainWindow::startup(const QString& fileToOpen)
     if (!fileToOpen.isEmpty() && QFileInfo::exists(fileToOpen)) {
         m_lesson->openFile(fileToOpen);
     } else {
-        QTimer::singleShot(700, this, [this]() { m_lesson->checkRecovery(); });
+        QTimer::singleShot(700, this, [this]() {
+            // On macOS a lesson double-clicked in Finder arrives as a file-open event just
+            // after start-up; it is treated like a lesson given on the command line.
+            if (!m_startupFileOpened)
+                m_lesson->checkRecovery();
+        });
     }
+}
+
+bool MainWindow::openFiles(const QStringList& paths, QPointF pageCenter)
+{
+    if (pageCenter.isNull())
+        pageCenter = m_canvas->view().viewToPage(QRectF(m_canvas->rect()).center());
+    QStringList images;
+    QString lesson;
+    QString pdf;
+    QString presentation;
+    for (const QString& path : paths) {
+        const QString suffix = QFileInfo(path).suffix().toLower();
+        if (suffix == QLatin1String("classboard"))
+            lesson = path;
+        else if (suffix == QLatin1String("pdf"))
+            pdf = path;
+        else if (suffix == QLatin1String("pptx") || suffix == QLatin1String("ppt") || suffix == QLatin1String("ppsx")
+                 || suffix == QLatin1String("pps") || suffix == QLatin1String("odp"))
+            presentation = path;
+        else if (isImageFile(path))
+            images << path;
+    }
+    if (!pdf.isEmpty())
+        m_lesson->importPdfFile(pdf);
+    else if (!presentation.isEmpty())
+        m_lesson->importPresentationFile(presentation);
+    else if (!images.isEmpty())
+        m_lesson->insertImageFiles(images, pageCenter);
+    else if (!lesson.isEmpty())
+        m_lesson->confirmDiscard([this, lesson]() { m_lesson->openFile(lesson); });
+    else
+        return false;
+    m_startupFileOpened = true;
+    return true;
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
@@ -534,32 +580,11 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         } else if (event->type() == QEvent::Drop) {
             auto* e = static_cast<QDropEvent*>(event);
             const QPointF pagePos = m_canvas->view().viewToPage(e->posF());
-            QStringList images;
-            QString lesson;
-            QString pdf;
-            QString presentation;
-            for (const QUrl& url : e->mimeData()->urls()) {
-                const QString path = url.toLocalFile();
-                const QString suffix = QFileInfo(path).suffix().toLower();
-                if (suffix == QLatin1String("classboard"))
-                    lesson = path;
-                else if (suffix == QLatin1String("pdf"))
-                    pdf = path;
-                else if (suffix == QLatin1String("pptx") || suffix == QLatin1String("ppt") || suffix == QLatin1String("ppsx")
-                         || suffix == QLatin1String("pps") || suffix == QLatin1String("odp"))
-                    presentation = path;
-                else if (isImageFile(path))
-                    images << path;
-            }
-            if (!pdf.isEmpty())
-                m_lesson->importPdfFile(pdf);
-            else if (!presentation.isEmpty())
-                m_lesson->importPresentationFile(presentation);
-            else if (!images.isEmpty())
-                m_lesson->insertImageFiles(images, pagePos);
-            else if (!lesson.isEmpty())
-                m_lesson->confirmDiscard([this, lesson]() { m_lesson->openFile(lesson); });
-            else if (e->mimeData()->hasImage())
+            QStringList paths;
+            for (const QUrl& url : e->mimeData()->urls())
+                if (url.isLocalFile())
+                    paths << url.toLocalFile();
+            if (!openFiles(paths, pagePos) && e->mimeData()->hasImage())
                 m_edit->insertMimeData(e->mimeData(), pagePos, false);
             e->acceptProposedAction();
             return true;

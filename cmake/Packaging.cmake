@@ -1,5 +1,7 @@
 # Installation and packaging (CPack). On Windows this produces a ZIP and, when NSIS is
-# installed, an installer that also registers the .classboard file type.
+# installed, an installer that also registers the .classboard file type. On macOS it produces
+# a drag-to-Applications disk image (ClassBoard-<version>-macOS-<arch>.dmg) holding a
+# self-contained ClassBoard.app.
 install(FILES
     "${PROJECT_SOURCE_DIR}/README.md"
     "${PROJECT_SOURCE_DIR}/LICENSE"
@@ -11,7 +13,7 @@ install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/" DESTINATION doc/licenses)
 
 # Optional: ship Poppler's command line tools (pdftoppm + DLLs) for offline PDF import.
 set(CLASSBOARD_POPPLER_DIR "" CACHE PATH "Folder containing pdftoppm and its libraries, installed as bin/poppler/bin")
-if(CLASSBOARD_POPPLER_DIR)
+if(CLASSBOARD_POPPLER_DIR AND NOT APPLE)
     install(DIRECTORY "${CLASSBOARD_POPPLER_DIR}/" DESTINATION bin/poppler/bin)
 endif()
 
@@ -46,6 +48,55 @@ if(WIN32)
         if(_windeployqt)
             execute_process(COMMAND \"\${_windeployqt}\" --no-translations --no-system-d3d-compiler --no-opengl-sw
                                     \"\${CMAKE_INSTALL_PREFIX}/bin/ClassBoard.exe\")
+        endif()
+    ")
+elseif(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+    set(CPACK_DMG_VOLUME_NAME "ClassBoard ${PROJECT_VERSION}")
+    set(CPACK_DMG_FORMAT "UDZO")
+    if(CMAKE_OSX_ARCHITECTURES)
+        string(REPLACE ";" "-" _arch "${CMAKE_OSX_ARCHITECTURES}")
+    else()
+        set(_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    set(CPACK_PACKAGE_FILE_NAME "ClassBoard-${PROJECT_VERSION}-macOS-${_arch}")
+
+    # Optional: Poppler's pdftoppm for PDF import without Qt PDF (e.g. Homebrew's
+    # /opt/homebrew/bin/pdftoppm). It is copied into ClassBoard.app/Contents/MacOS and
+    # macdeployqt bundles the libraries it needs.
+    set(CLASSBOARD_PDFTOPPM "" CACHE FILEPATH "pdftoppm executable to ship inside ClassBoard.app")
+    if(CLASSBOARD_PDFTOPPM)
+        install(PROGRAMS "${CLASSBOARD_PDFTOPPM}" DESTINATION ClassBoard.app/Contents/MacOS)
+    endif()
+
+    # Qt runtime: macdeployqt copies the Qt frameworks, plug-ins and any other non-system
+    # library into the installed bundle; it is then signed ad hoc (required on Apple silicon
+    # after macdeployqt rewrote the binaries). A Developer ID can be used instead with
+    # -DCLASSBOARD_CODESIGN_IDENTITY="Developer ID Application: ...".
+    set(CLASSBOARD_CODESIGN_IDENTITY "-" CACHE STRING "codesign identity for ClassBoard.app ('-' = ad hoc)")
+    get_target_property(_qmake Qt5::qmake IMPORTED_LOCATION)
+    get_filename_component(_qtbin "${_qmake}" DIRECTORY)
+    install(CODE "
+        set(_app \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/ClassBoard.app\")
+        find_program(_macdeployqt macdeployqt HINTS \"${_qtbin}\")
+        if(NOT _macdeployqt)
+            message(FATAL_ERROR \"macdeployqt not found next to ${_qmake}\")
+        endif()
+        set(_extra)
+        if(EXISTS \"\${_app}/Contents/MacOS/pdftoppm\")
+            set(_extra \"-executable=\${_app}/Contents/MacOS/pdftoppm\")
+        endif()
+        execute_process(COMMAND \"\${_macdeployqt}\" \"\${_app}\" -always-overwrite \${_extra} RESULT_VARIABLE _rc)
+        if(NOT _rc EQUAL 0)
+            message(FATAL_ERROR \"macdeployqt failed (\${_rc})\")
+        endif()
+        set(_sign codesign --force --deep --timestamp=none --sign \"${CLASSBOARD_CODESIGN_IDENTITY}\")
+        if(NOT \"${CLASSBOARD_CODESIGN_IDENTITY}\" STREQUAL \"-\")
+            set(_sign codesign --force --deep --options runtime --timestamp --sign \"${CLASSBOARD_CODESIGN_IDENTITY}\")
+        endif()
+        execute_process(COMMAND \${_sign} \"\${_app}\" RESULT_VARIABLE _rc)
+        if(NOT _rc EQUAL 0)
+            message(FATAL_ERROR \"codesign failed (\${_rc})\")
         endif()
     ")
 else()

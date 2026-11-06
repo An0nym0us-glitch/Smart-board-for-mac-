@@ -4,6 +4,7 @@
 #include "input/PalmGesture.h"
 
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
 #include <QSet>
 #include <QTabletEvent>
 #include <QTouchEvent>
@@ -65,6 +66,8 @@ bool InputManager::handleEvent(QEvent* event)
         return handleTouch(static_cast<QTouchEvent*>(event));
     case QEvent::Wheel:
         return handleWheel(static_cast<QWheelEvent*>(event));
+    case QEvent::NativeGesture:
+        return handleNativeGesture(static_cast<QNativeGestureEvent*>(event));
     default:
         return false;
     }
@@ -244,6 +247,28 @@ bool InputManager::handleWheel(QWheelEvent* e)
     }
     e->accept();
     return true;
+}
+
+// ------------------------------------------------------------------------- native (trackpad) gestures
+
+bool InputManager::handleNativeGesture(QNativeGestureEvent* e)
+{
+    switch (e->gestureType()) {
+    case Qt::ZoomNativeGesture: {
+        // value() is the change of magnification since the previous event (e.g. 0.02 = 2 %).
+        const qreal factor = 1.0 + e->value();
+        if (factor > 0.0 && !qFuzzyCompare(factor, 1.0))
+            m_sink.wheelZoom(e->localPos(), factor);
+        e->accept();
+        return true;
+    }
+    case Qt::BeginNativeGesture:
+    case Qt::EndNativeGesture:
+        e->accept();
+        return true;
+    default:
+        return false;
+    }
 }
 
 // ------------------------------------------------------------------------------------------ touch
@@ -562,6 +587,12 @@ void InputManager::classifyNewTouch(int id, qint64 now, Qt::KeyboardModifiers mo
 
 bool InputManager::handleTouch(QTouchEvent* e)
 {
+    // Fingers on a trackpad (macOS) are not on the board: they scroll and pinch through wheel
+    // and native gesture events. Ignoring the touch sequence keeps them from drawing.
+    if (e->device() && e->device()->type() == QTouchDevice::TouchPad) {
+        e->ignore();
+        return false;
+    }
     e->accept();
     if (e->type() == QEvent::TouchCancel) {
         cancelAll();
