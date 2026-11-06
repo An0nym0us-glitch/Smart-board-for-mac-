@@ -209,6 +209,15 @@ MainWindow::MainWindow(UiContext& ui, AppSettings& settings, QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+    // Widgets that hold on to m_services go first: closed popovers are only deleteLater()'d and
+    // would otherwise outlive the services. Reparenting the central widget below re-polishes
+    // the widget tree, which on macOS asks e.g. the page navigator for its size hint.
+    if (m_popoverHost) {
+        m_popoverHost->closeAll();
+        qDeleteAll(m_popoverHost->findChildren<Popover*>(QString(), Qt::FindDirectChildrenOnly));
+    }
+    delete m_selectionBar;
+    m_selectionBar = nullptr;
     // Tear down controllers before the widgets and the document they reference.
     m_services.reset();
     m_popovers.reset();

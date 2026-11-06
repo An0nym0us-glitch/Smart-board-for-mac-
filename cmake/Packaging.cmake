@@ -22,7 +22,11 @@ set(CPACK_PACKAGE_VENDOR "ClassBoard contributors")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "ClassBoard")
-set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+if(NOT APPLE)
+    # On macOS this would turn into a licence agreement that blocks opening the disk image
+    # (and mounting it from scripts); LICENSE is in the image's doc folder instead.
+    set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+endif()
 set(CPACK_PACKAGE_EXECUTABLES "ClassBoard" "ClassBoard")
 
 if(WIN32)
