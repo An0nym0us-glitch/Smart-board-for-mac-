@@ -147,6 +147,8 @@ jobs:
 
       - name: Start the packaged app
         timeout-minutes: 5
+        env:
+          QT_DEBUG_PLUGINS: 1 # names the library if a Qt plug-in cannot be loaded
         run: |
           hdiutil attach -nobrowse -readonly -mountpoint /tmp/cb build/ClassBoard-*.dmg
           /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --version
@@ -204,6 +206,8 @@ jobs:
 
       - name: Start the packaged app
         timeout-minutes: 5
+        env:
+          QT_DEBUG_PLUGINS: 1 # names the library if a Qt plug-in cannot be loaded
         run: |
           hdiutil attach -nobrowse -readonly -mountpoint /tmp/cb build/ClassBoard-*.dmg
           /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --version

@@ -29,6 +29,7 @@ echo "Version: $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "
      "minimum macOS: $(/usr/libexec/PlistBuddy -c 'Print LSMinimumSystemVersion' "$app/Contents/Info.plist")"
 
 # Every library a binary in the bundle loads must be in the bundle or part of macOS.
+app_real="$(cd "$app" && pwd -P)"
 bad=0
 while IFS= read -r -d '' f; do
     if file -b "$f" | grep -q 'Mach-O'; then
@@ -39,7 +40,20 @@ while IFS= read -r -d '' f; do
                 continue
             fi
             case "$dep" in
-                @executable_path/*|@loader_path/*|@rpath/*|/usr/lib/*|/System/*) ;;
+                @executable_path/*|@loader_path/*)
+                    # Relative references must end up at a file inside the bundle.
+                    if [ "${dep#@executable_path/}" != "$dep" ]; then
+                        target="$app/Contents/MacOS/${dep#@executable_path/}"
+                    else
+                        target="$(dirname "$f")/${dep#@loader_path/}"
+                    fi
+                    real="$(cd "$(dirname "$target")" 2> /dev/null && pwd -P)/$(basename "$target")"
+                    case "$real" in
+                        "$app_real"/*) [ -e "$real" ] || { echo "::error::$f loads $dep, which is missing ($real)"; bad=1; } ;;
+                        *) echo "::error::$f loads $dep, which resolves outside the bundle ($real)"; bad=1 ;;
+                    esac ;;
+                @rpath/*) echo "note: $f loads $dep through its search paths" ;;
+                /usr/lib/*|/System/*) ;;
                 *) echo "::error::$f loads $dep from outside the bundle"; bad=1 ;;
             esac
         done < <(otool -L "$f" | tail -n +2 | awk '{print $1}')
