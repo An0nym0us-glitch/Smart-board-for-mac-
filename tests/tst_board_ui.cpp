@@ -29,6 +29,7 @@
 #include "ui/Popover.h"
 #include "ui/Ribbon.h"
 #include "ui/SelectionBar.h"
+#include "ui/Toast.h"
 #include "ui/UiContext.h"
 #include "ui/popovers/MagicEquationPanel.h"
 #include "ui/widgets/NumberField.h"
@@ -257,16 +258,18 @@ private slots:
         QVERIFY(clear && del);
         QVERIFY(clear->isEnabled() && del->isEnabled());
         QTest::mouseClick(clear, Qt::LeftButton);
-        QTest::qWait(150);
-        // Confirmation inside the board (no system dialog).
-        TouchButton* confirm = buttonIn(m_window.get(), QStringLiteral("Clear page"));
-        QVERIFY(confirm);
+        // Confirmation inside the board (no system dialog). Look for its button in the overlay
+        // only: the page menu, which has a "Clear page" button too, may still be fading out.
+        ConfirmOverlay* overlay = nullptr;
+        QTRY_VERIFY((overlay = m_window->findChild<ConfirmOverlay*>()) != nullptr);
+        TouchButton* confirm = nullptr;
+        QTRY_VERIFY((confirm = buttonIn(overlay, QStringLiteral("Clear page"))) != nullptr);
         shot(QStringLiteral("board-clear-confirm"));
         QTest::mouseClick(confirm, Qt::LeftButton);
-        QTest::qWait(100);
+        QTRY_COMPARE(page().objectCount(), 0);
+        QTRY_VERIFY(m_window->findChild<ConfirmOverlay*>() == nullptr);
         QCOMPARE(doc().pageCount(), 2);
         QCOMPARE(page().id(), id);
-        QCOMPARE(page().objectCount(), 0);
 
         // Delete page removes the page itself; undo restores it.
         QTest::mouseClick(m_window->ribbon().pageMenuButton(), Qt::LeftButton);
