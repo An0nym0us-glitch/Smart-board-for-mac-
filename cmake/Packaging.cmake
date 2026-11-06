@@ -70,7 +70,9 @@ elseif(APPLE)
     # macdeployqt bundles the libraries it needs.
     set(CLASSBOARD_PDFTOPPM "" CACHE FILEPATH "pdftoppm executable to ship inside ClassBoard.app")
     if(CLASSBOARD_PDFTOPPM)
-        install(PROGRAMS "${CLASSBOARD_PDFTOPPM}" DESTINATION ClassBoard.app/Contents/MacOS)
+        # Homebrew's bin/pdftoppm is a relative link into its Cellar: install the real file.
+        get_filename_component(_pdftoppm "${CLASSBOARD_PDFTOPPM}" REALPATH)
+        install(PROGRAMS "${_pdftoppm}" DESTINATION ClassBoard.app/Contents/MacOS RENAME pdftoppm)
     endif()
 
     # Qt runtime: cmake/MacDeploy.cmake runs macdeployqt on the installed bundle, removes

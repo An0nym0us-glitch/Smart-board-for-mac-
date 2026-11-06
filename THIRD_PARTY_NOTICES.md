@@ -10,8 +10,7 @@ file.
 * Copyright © The Qt Company Ltd. and other contributors.
 * Used under the **GNU Lesser General Public License version 3** (`licenses/LGPL-3.0.txt`,
   which builds on `licenses/GPL-3.0.txt`).
-* ClassBoard uses the Qt Core, Gui, Widgets and Svg modules (and, in the Intel macOS build,
-  Qt PDF) and the plugins `windeployqt` / `macdeployqt` deploy with them. They are
+* ClassBoard uses the Qt Core, Gui, Widgets and Svg modules and the plugins `windeployqt` / `macdeployqt` deploy with them. They are
   dynamically linked: the Qt DLLs and plugins in the `bin` folder, and the frameworks and
   plug-ins in `ClassBoard.app/Contents/Frameworks` and `Contents/PlugIns` on macOS, are
   unmodified apart from the library paths `macdeployqt` rewrites, and can be replaced with
@@ -38,7 +37,7 @@ file.
 * The libraries bundled with Poppler (such as Cairo, FreeType, Fontconfig, libpng, libjpeg,
   libtiff, OpenJPEG, Little CMS and zlib) are under their own open-source licences; the licence
   files that come with that build are copied to `bin\poppler\licenses`.
-* **macOS (Apple silicon build):** `pdftoppm` is shipped in `ClassBoard.app/Contents/MacOS`
+* **macOS (both disk images):** `pdftoppm` is shipped in `ClassBoard.app/Contents/MacOS`
   and the libraries it needs in `Contents/Frameworks`, taken unmodified (apart from library
   paths) from Homebrew's `poppler` formula (<https://formulae.brew.sh/formula/poppler>), which
   documents how it and its dependencies are built.

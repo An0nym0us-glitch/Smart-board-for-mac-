@@ -21,8 +21,9 @@ Windows 10/11 and Linux.
 `.classboard` lessons then open with a double-click in Finder, and **Open With → ClassBoard**
 imports PDFs, presentations and images. On a trackpad, two fingers scroll the board and a
 pinch zooms; on an interactive display or pen tablet connected to the Mac you write directly.
-Shortcuts use ⌘ where the guide says Ctrl. PDF import works out of the box; PowerPoint import
-needs the free [LibreOffice](https://www.libreoffice.org) in Applications.
+Shortcuts use ⌘ where the guide says Ctrl. PDF import is included (in the Intel image it
+needs macOS 15 or later); PowerPoint import needs the free
+[LibreOffice](https://www.libreoffice.org) in Applications.
 
 The board fills the screen. The most-used commands sit in a ribbon along the bottom, and the
 rest open as popovers attached to the button that opened them, so you stay on the board.

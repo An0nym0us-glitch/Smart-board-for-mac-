@@ -154,6 +154,9 @@ jobs:
           /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --version
           /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --screenshot "$PWD/screenshot-macos-arm64.png"
           test -s screenshot-macos-arm64.png
+          # PDF import: the bundled pdftoppm renders a page of the user guide.
+          /tmp/cb/ClassBoard.app/Contents/MacOS/pdftoppm -f 1 -l 1 -r 30 -png docs/ClassBoard-User-Guide-compact.pdf /tmp/page
+          ls -l /tmp/page-*.png
           hdiutil detach /tmp/cb
 
       - name: Upload disk image
@@ -174,8 +177,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The official Qt 5.15.2 build runs on macOS 10.13 and later. Its WebEngine package
-      # contains Qt PDF, so PDF import needs no Poppler.
+      # The official Qt 5.15.2 build runs on macOS 10.13 and later. Poppler's pdftoppm (for PDF
+      # import) comes from Homebrew, whose libraries need the runner's macOS (15).
       - name: Install Qt 5.15
         uses: jurplel/install-qt-action@v4
         with:
@@ -183,14 +186,15 @@ jobs:
           host: 'mac'
           target: 'desktop'
           arch: 'clang_64'
-          modules: 'qtwebengine'
           cache: true
 
-      - name: Install Ninja
-        run: brew install ninja
+      - name: Install Ninja and Poppler
+        run: brew install ninja poppler
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 \
+            -DCLASSBOARD_PDFTOPPM="$(brew --prefix)/bin/pdftoppm"
 
       - name: Build
         run: cmake --build build
@@ -213,6 +217,9 @@ jobs:
           /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --version
           /tmp/cb/ClassBoard.app/Contents/MacOS/ClassBoard --screenshot "$PWD/screenshot-macos-x86_64.png"
           test -s screenshot-macos-x86_64.png
+          # PDF import: the bundled pdftoppm renders a page of the user guide.
+          /tmp/cb/ClassBoard.app/Contents/MacOS/pdftoppm -f 1 -l 1 -r 30 -png docs/ClassBoard-User-Guide-compact.pdf /tmp/page
+          ls -l /tmp/page-*.png
           hdiutil detach /tmp/cb
 
       - name: Upload disk image

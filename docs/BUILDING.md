@@ -131,11 +131,10 @@ disk image.
            -DCMAKE_OSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion | cut -d. -f1).0"
      ```
    * or the official Qt 5.15.2 build (Intel; also runs on Apple silicon through Rosetta 2,
-     and on macOS 10.13 and later). Its *Qt WebEngine* package contains Qt PDF, which
-     ClassBoard then uses for PDF import:
+     and on macOS 10.13 and later):
      ```bash
      pip3 install aqtinstall
-     aqt install-qt mac desktop 5.15.2 clang_64 -m qtwebengine -O ~/Qt
+     aqt install-qt mac desktop 5.15.2 clang_64 -O ~/Qt
      cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
            -DCMAKE_PREFIX_PATH=~/Qt/5.15.2/clang_64 -DCMAKE_OSX_ARCHITECTURES=x86_64
      ```
@@ -157,7 +156,7 @@ CI builds `ClassBoard-<version>-macOS-arm64.dmg` (Apple silicon, Homebrew Qt) an
 from a configured build tree:
 
 ```bash
-# Optional, when Qt PDF is not available: ship Poppler's pdftoppm inside the app.
+# Ship Poppler's pdftoppm inside the app for PDF import (not needed if Qt has Qt PDF).
 cmake build -DCLASSBOARD_PDFTOPPM="$(brew --prefix)/bin/pdftoppm"
 cmake --build build
 scripts/macos/package.sh build
@@ -189,8 +188,10 @@ hardened runtime, then notarise the image with `xcrun notarytool submit … --wa
 
 ### Import on macOS
 
-* **PDF:** built in (Qt PDF, Intel build) or with the `pdftoppm` shipped in the app (Apple
-  silicon build). A source build without either finds Poppler from Homebrew or MacPorts
+* **PDF:** both disk images ship Poppler's `pdftoppm` (from Homebrew) inside the app. In the
+  Intel image it needs macOS 15 or later, like Homebrew's Intel libraries (the rest of the app
+  runs on macOS 10.13 and later). A source
+  build without a bundled `pdftoppm` or Qt PDF finds Poppler from Homebrew or MacPorts
   (`brew install poppler`) even when ClassBoard is started from Finder.
 * **PowerPoint (.ppt, .pptx):** needs LibreOffice in `/Applications` or `~/Applications`
   (`brew install --cask libreoffice`). Microsoft PowerPoint for Mac cannot be automated
