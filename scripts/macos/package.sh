@@ -32,7 +32,12 @@ echo "Version: $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "
 bad=0
 while IFS= read -r -d '' f; do
     if file -b "$f" | grep -q 'Mach-O'; then
+        # A library's own install name (LC_ID_DYLIB) is listed too; it is not loaded.
+        id="$(otool -D "$f" | tail -n +2)"
         while read -r dep; do
+            if [ -n "$id" ] && [ "$dep" = "$id" ]; then
+                continue
+            fi
             case "$dep" in
                 @executable_path/*|@loader_path/*|@rpath/*|/usr/lib/*|/System/*) ;;
                 *) echo "::error::$f loads $dep from outside the bundle"; bad=1 ;;

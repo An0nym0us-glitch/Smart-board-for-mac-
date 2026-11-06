@@ -1,0 +1,62 @@
+# Install-time script (macOS): makes the installed ClassBoard.app self-contained.
+#
+#  1. macdeployqt copies the Qt frameworks, plug-ins and every other non-system library the
+#     app (and, if present, Contents/MacOS/pdftoppm) needs into the bundle.
+#  2. Library search paths (LC_RPATH) that point outside the bundle are removed. Some
+#     Homebrew libraries keep one into /opt/homebrew/Cellar; on a Mac with Homebrew it could
+#     load a different copy of a library than the one shipped.
+#  3. The bundle is signed again: macdeployqt and install_name_tool invalidate signatures, and
+#     Apple silicon refuses to run code whose signature does not match.
+#
+# Set by the install(CODE) block in Packaging.cmake: CLASSBOARD_MACDEPLOYQT,
+# CLASSBOARD_CODESIGN_IDENTITY.
+
+set(_app "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/ClassBoard.app")
+if(NOT EXISTS "${_app}/Contents/MacOS/ClassBoard")
+    message(FATAL_ERROR "${_app} was not installed")
+endif()
+if(NOT CLASSBOARD_MACDEPLOYQT)
+    message(FATAL_ERROR "macdeployqt was not found next to the Qt this build uses")
+endif()
+
+set(_args "${_app}" -always-overwrite)
+if(EXISTS "${_app}/Contents/MacOS/pdftoppm")
+    list(APPEND _args "-executable=${_app}/Contents/MacOS/pdftoppm")
+endif()
+message(STATUS "macdeployqt ${_args}")
+execute_process(COMMAND "${CLASSBOARD_MACDEPLOYQT}" ${_args} RESULT_VARIABLE _rc)
+if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "macdeployqt failed (${_rc})")
+endif()
+
+file(GLOB_RECURSE _files LIST_DIRECTORIES false "${_app}/Contents/*")
+foreach(_file IN LISTS _files)
+    if(IS_SYMLINK "${_file}")
+        continue()
+    endif()
+    execute_process(COMMAND otool -l "${_file}" OUTPUT_VARIABLE _loads ERROR_QUIET RESULT_VARIABLE _rc)
+    if(NOT _rc EQUAL 0 OR NOT _loads MATCHES "LC_RPATH")
+        continue() # not a Mach-O file, or nothing to clean
+    endif()
+    string(REGEX MATCHALL "cmd LC_RPATH[^\n]*\n[^\n]*\n *path [^ \n]+" _entries "${_loads}")
+    foreach(_entry IN LISTS _entries)
+        string(REGEX REPLACE ".*path ([^ \n]+)$" "\\1" _rpath "${_entry}")
+        if(NOT _rpath MATCHES "^@(executable|loader)_path")
+            message(STATUS "Removing search path ${_rpath} from ${_file}")
+            execute_process(COMMAND install_name_tool -delete_rpath "${_rpath}" "${_file}" RESULT_VARIABLE _rc)
+            if(NOT _rc EQUAL 0)
+                message(FATAL_ERROR "install_name_tool -delete_rpath ${_rpath} ${_file} failed")
+            endif()
+        endif()
+    endforeach()
+endforeach()
+
+if(CLASSBOARD_CODESIGN_IDENTITY STREQUAL "-")
+    set(_sign codesign --force --deep --timestamp=none --sign -)
+else()
+    set(_sign codesign --force --deep --options runtime --timestamp --sign "${CLASSBOARD_CODESIGN_IDENTITY}")
+endif()
+execute_process(COMMAND ${_sign} "${_app}" RESULT_VARIABLE _rc)
+if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "codesign failed (${_rc})")
+endif()

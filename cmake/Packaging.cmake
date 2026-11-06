@@ -73,36 +73,18 @@ elseif(APPLE)
         install(PROGRAMS "${CLASSBOARD_PDFTOPPM}" DESTINATION ClassBoard.app/Contents/MacOS)
     endif()
 
-    # Qt runtime: macdeployqt copies the Qt frameworks, plug-ins and any other non-system
-    # library into the installed bundle; it is then signed ad hoc (required on Apple silicon
-    # after macdeployqt rewrote the binaries). A Developer ID can be used instead with
-    # -DCLASSBOARD_CODESIGN_IDENTITY="Developer ID Application: ...".
+    # Qt runtime: cmake/MacDeploy.cmake runs macdeployqt on the installed bundle, removes
+    # library search paths that point outside it and signs it, ad hoc by default. A Developer
+    # ID can be used instead with -DCLASSBOARD_CODESIGN_IDENTITY="Developer ID Application: ...".
     set(CLASSBOARD_CODESIGN_IDENTITY "-" CACHE STRING "codesign identity for ClassBoard.app ('-' = ad hoc)")
     get_target_property(_qmake Qt5::qmake IMPORTED_LOCATION)
     get_filename_component(_qtbin "${_qmake}" DIRECTORY)
+    find_program(CLASSBOARD_MACDEPLOYQT macdeployqt HINTS "${_qtbin}" NO_DEFAULT_PATH)
     install(CODE "
-        set(_app \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/ClassBoard.app\")
-        find_program(_macdeployqt macdeployqt HINTS \"${_qtbin}\")
-        if(NOT _macdeployqt)
-            message(FATAL_ERROR \"macdeployqt not found next to ${_qmake}\")
-        endif()
-        set(_extra)
-        if(EXISTS \"\${_app}/Contents/MacOS/pdftoppm\")
-            set(_extra \"-executable=\${_app}/Contents/MacOS/pdftoppm\")
-        endif()
-        execute_process(COMMAND \"\${_macdeployqt}\" \"\${_app}\" -always-overwrite \${_extra} RESULT_VARIABLE _rc)
-        if(NOT _rc EQUAL 0)
-            message(FATAL_ERROR \"macdeployqt failed (\${_rc})\")
-        endif()
-        set(_sign codesign --force --deep --timestamp=none --sign \"${CLASSBOARD_CODESIGN_IDENTITY}\")
-        if(NOT \"${CLASSBOARD_CODESIGN_IDENTITY}\" STREQUAL \"-\")
-            set(_sign codesign --force --deep --options runtime --timestamp --sign \"${CLASSBOARD_CODESIGN_IDENTITY}\")
-        endif()
-        execute_process(COMMAND \${_sign} \"\${_app}\" RESULT_VARIABLE _rc)
-        if(NOT _rc EQUAL 0)
-            message(FATAL_ERROR \"codesign failed (\${_rc})\")
-        endif()
+        set(CLASSBOARD_MACDEPLOYQT \"${CLASSBOARD_MACDEPLOYQT}\")
+        set(CLASSBOARD_CODESIGN_IDENTITY \"${CLASSBOARD_CODESIGN_IDENTITY}\")
     ")
+    install(SCRIPT "${PROJECT_SOURCE_DIR}/cmake/MacDeploy.cmake")
 else()
     set(CPACK_GENERATOR "TGZ")
 endif()
