@@ -32,6 +32,12 @@ endif()
 file(GLOB_RECURSE _files LIST_DIRECTORIES false "${_app}/Contents/*")
 foreach(_file IN LISTS _files)
     if(IS_SYMLINK "${_file}")
+        # Framework links whose target macdeployqt did not copy (e.g. Headers) make
+        # "codesign --verify --strict" fail; they are of no use in an app bundle.
+        if(NOT EXISTS "${_file}")
+            message(STATUS "Removing broken link ${_file}")
+            file(REMOVE "${_file}")
+        endif()
         continue()
     endif()
     execute_process(COMMAND otool -l "${_file}" OUTPUT_VARIABLE _loads ERROR_QUIET RESULT_VARIABLE _rc)

@@ -54,7 +54,13 @@ done < <(find "$app/Contents" -type f -print0)
 if [ "$bad" -ne 0 ]; then
     exit 1
 fi
-codesign --verify --deep --strict "$app"
+broken="$(find "$app" -type l ! -exec test -e {} \; -print)"
+if [ -n "$broken" ]; then
+    echo "::error::Broken links in the bundle:"
+    echo "$broken"
+    exit 1
+fi
+codesign --verify --deep --strict --verbose=2 "$app"
 echo "Architectures: $(lipo -archs "$app/Contents/MacOS/ClassBoard")"
 if [ -x "$app/Contents/MacOS/pdftoppm" ]; then
     "$app/Contents/MacOS/pdftoppm" -v 2>&1 | head -n 1
