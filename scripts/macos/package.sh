@@ -52,7 +52,10 @@ while IFS= read -r -d '' f; do
                         "$app_real"/*) [ -e "$real" ] || { echo "::error::$f loads $dep, which is missing ($real)"; bad=1; } ;;
                         *) echo "::error::$f loads $dep, which resolves outside the bundle ($real)"; bad=1 ;;
                     esac ;;
-                @rpath/*) echo "note: $f loads $dep through its search paths" ;;
+                @rpath/*)
+                    # Search paths only ever point into Contents/Frameworks (checked below).
+                    [ -e "$app/Contents/Frameworks/${dep#@rpath/}" ] \
+                        || { echo "::error::$f loads $dep, which is not in Contents/Frameworks"; bad=1; } ;;
                 /usr/lib/*|/System/*) ;;
                 *) echo "::error::$f loads $dep from outside the bundle"; bad=1 ;;
             esac
@@ -65,6 +68,10 @@ while IFS= read -r -d '' f; do
         done < <(otool -l "$f" | awk '/cmd LC_RPATH/ {getline; getline; print $2}')
     fi
 done < <(find "$app/Contents" -type f -print0)
+if ! otool -l "$app/Contents/MacOS/ClassBoard" | grep -q 'path @executable_path/../Frameworks '; then
+    echo "::error::ClassBoard does not search Contents/Frameworks for its @rpath libraries"
+    bad=1
+fi
 if [ "$bad" -ne 0 ]; then
     exit 1
 fi
